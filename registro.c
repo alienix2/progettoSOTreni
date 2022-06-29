@@ -7,6 +7,8 @@
 #include <sys/un.h> /* For AFUNIX sockets */
 #define DEFAULT_PROTOCOL 0
 
+//Registro di PROVA, ToDo quello vero
+
 int receiveNumero(int fd) {
   int numero;
   recv(fd, &numero, sizeof(numero), 0);
