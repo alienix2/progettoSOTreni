@@ -4,6 +4,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/shm.h>
+#include <semaphore.h>
 #include <sys/un.h> /* For AFUNIX sockets */
 #define DEFAULT_PROTOCOL 0
 
@@ -62,20 +64,49 @@ void inviaNumero(int fd){  //Invia un numero sul canale
     }
 }
 
+void inviaPid(int RBC, struct sockaddr *RBCAddressPtr, int clientLen){
+    int invio;
+    int clientFd = accept (RBC, RBCAddressPtr, &clientLen);
+    invio = htonl(getpid());
+    while(send(clientFd, &invio, sizeof(invio), 0) < 0){
+        sleep(2);
+    }
+}
+
 int main (void) {
     int registro, registroLen;
+    int RBC, RBClen;
     int clientFd, serverLen, clientLen;
+    char *itinerari[6][7];
+    char *segmenti[17];
+    char *stazioni[8];
+
     struct sockaddr* serverSockAddrPtr; /*Ptr to server address*/
     struct sockaddr_un clientUNIXAddress; /*Client address */
+    struct sockaddr_un RBCAddress; //Indirizzo del registro
+    struct sockaddr* RBCAddressPtr = (struct registroAddressPtr*) &RBCAddress; //Puntatore all'indirizzo del registro
 
     struct sockaddr_un registroAddress; //Indirizzo del registro
     struct sockaddr* registroAddressPtr = (struct registroAddressPtr*) &registroAddress; //Puntatore all'indirizzo del registro
 
-    char *itinerario[6][7];
+    serverSockAddrPtr = (struct sockaddr*) &RBCAddress;
+    serverLen = sizeof (RBCAddress);
+    RBCAddressPtr = (struct sockaddr*) &clientUNIXAddress;
+    clientLen = sizeof (clientUNIXAddress);
+    
     creaSocket(&registro, &registroAddress, &registroLen, "RegistroTreni");
     connetti(registro, registroAddressPtr, registroLen);
     inviaNumero(registro);
-    riceviItinerari(registro, &itinerario);
-    printf("%s\n", itinerario[1][6]);
+    riceviItinerari(registro, &itinerari);
+
+    RBC = socket (AF_UNIX, SOCK_STREAM, DEFAULT_PROTOCOL);
+    RBCAddress.sun_family = AF_UNIX; /* Set domain type */
+    strcpy (RBCAddress.sun_path, "ServerRBC"); /* Set name */
+    unlink ("ServerRBC"); /* Remove file if it already exists */
+    bind (RBC, serverSockAddrPtr, serverLen);/*Create file*/
+    listen (RBC, 6); /* Maximum pending connection length */
+    inviaPid(RBC, RBCAddressPtr, clientLen);
+
+    //creaConnessione();
     return 0;
 }

@@ -49,7 +49,6 @@ void preliminariTerminazione(TRENO *trenoCorrente){ //Funzione richiamata dai fi
         free(trenoCorrente->itinerario[i]);
     }
     fclose(trenoCorrente->log);
-    if(ETCS)
     kill(getppid(), SIGUSR1);
 }
 
@@ -77,10 +76,18 @@ void aggiungiLog(TRENO trenoCorrente, const char *fmt, ...){    //Aggiunge la st
     fflush(trenoCorrente.log);
 }
 
+void riceviPid(int fd, int *pid){
+    if(recv(fd, pid, sizeof(int), 0) < 0){
+        perror("recv");
+    }
+    pid = htonl(pid);
+    close(fd);
+}
+
 void creaSegmenti(){    //Funzione richiamata dal padre, inizializza 20 file di testo chiamati MAX con X in [1,17]
     char ma[20];
     for(int i = 1; i<17; i++){
-        sprintf(ma, "%s/MA%d.txt",itinerarioFolder, i);
+        sprintf(ma, "%s/MA%d.txt", itinerarioFolder, i);
         segmentiDescriptor[i] = open(ma, O_CREAT|O_RDWR);
         fchmod(segmentiDescriptor[i], S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
         if(write(segmentiDescriptor[i], "0", 1) < 0) exit(EXIT_FAILURE);
@@ -146,7 +153,6 @@ void leggiElemento (int fd, char *str, TRENO trenoCorrente) {   //Funzione gener
 void riceviItinerario (int fd, TRENO *trenoCorrente) {  //Ricevo 7 stringhe e le metto correttamente all'interno dell'itinerario del treno
     char str[200];
     int i = 0;
-    char *prova[7];
     for(int i = 0; i<7; i++){
         leggiElemento(fd, str, *trenoCorrente);
         trenoCorrente->itinerario[i] = (char*) malloc(strlen(str)*sizeof(char));
@@ -220,7 +226,7 @@ int percorriItinerario(TRENO *trenoCorrente, int RBC){  //Funzione che scorre l'
     int numeroSegmentoProssimo; //Segmento a cui si dovrà accedere successivamente
     int numeroSegmentoAttuale;  //Segmento in cui ci troviamo
     aggiungiLog(*trenoCorrente,"Inizio il mio persorso, esco dalla stazione!");
-    for(trenoCorrente->posizioneAttuale = 0; trenoCorrente->posizioneAttuale < 6; trenoCorrente->posizioneAttuale++){   //Tutti i treni eseguono 6 iterazioni
+    for(trenoCorrente->posizioneAttuale = 0; trenoCorrente->posizioneAttuale < 6 && strcmp(trenoCorrente->itinerario[trenoCorrente->posizioneAttuale], "0") != 0; trenoCorrente->posizioneAttuale++){   //Tutti i treni eseguono 6 iterazioni
         aggiungiLog(*trenoCorrente,"[ATTUALE:%s],[NEXT:%s]",trenoCorrente->itinerario[trenoCorrente->posizioneAttuale],trenoCorrente->itinerario[trenoCorrente->posizioneAttuale+1]);
         numeroSegmentoProssimo = atoi(trenoCorrente->itinerario[trenoCorrente->posizioneAttuale + 1] + 2);  //Restituisce il numero del segmento, con stazione restituisce 0
         numeroSegmentoAttuale = atoi(trenoCorrente->itinerario[trenoCorrente->posizioneAttuale] + 2);   //Restituisce il numero del segmento, con stazione restituisce 0
@@ -235,7 +241,7 @@ int main(int argc, char *argv[]) {
     int pid[7];
     signal(SIGUSR1, contaTerminazioniHandler);
     int registro, registroLen;
-    int RBC, RBCLen;
+    int RBC, RBCLen, RBCPid;
     TRENO trenoCorrente;
     ETCS = atoi(argv[1] + 4); //Interpreto la X nella scritta "ETCSX"
     struct sockaddr_un registroAddress; //Indirizzo del registro
@@ -247,7 +253,12 @@ int main(int argc, char *argv[]) {
     creaLog(&trenoCorrente);
     creaSegmenti();
     inizializzaSemafori();
-
+    if(ETCS == 2){
+        creaSocket(&RBC, &RBCAddress, &RBCLen, "ServerRBC");
+        connetti(trenoCorrente, RBC, RBCAddressPtr, RBCLen);
+        riceviPid(RBC, &RBCPid);
+        printf("%d\n", RBCPid);
+    }
     for(int i = 1; i<6; i++){
         if((pid[i] = fork()) < 0) exit(EXIT_FAILURE);
         else if(pid[i] == 0){ //Codice dei figli
@@ -260,11 +271,10 @@ int main(int argc, char *argv[]) {
                 aggiungiLog(trenoCorrente,"Mi connetto a RBC");
                 creaSocket(&RBC, &RBCAddress, &RBCLen, "RBC");
                 connetti(trenoCorrente, RBC, RBCAddressPtr, RBCLen);
-                sleep(1);
             }
             inviaNumero(registro, trenoCorrente);
             riceviItinerario(registro, &trenoCorrente);
-            if(trenoCorrente.posizioneAttuale != "0"){
+            if(strcmp(trenoCorrente.itinerario[trenoCorrente.posizioneAttuale], "0") != 0){
                 percorriItinerario(&trenoCorrente, RBC);
             }
             else{

@@ -35,7 +35,7 @@ int sendItinerario(int fd, char **itinerario[5][7], int numeroTreno){
     return 0;
 }
 
-int main (void) {
+int main (int argc, char *argv[]) {
     int registro, clientFd, serverLen, clientLen;
     struct sockaddr_un registroAddress; /*Server address */
     struct sockaddr* serverSockAddrPtr; /*Ptr to server address*/
@@ -62,7 +62,7 @@ int main (void) {
     strcpy (registroAddress.sun_path, "RegistroTreni"); /* Set name */
     unlink ("RegistroTreni"); /* Remove file if it already exists */
     bind (registro, serverSockAddrPtr, serverLen);/*Create file*/
-    listen (registro, 5); /* Maximum pending connection length */
+    listen (registro, 6); /* Maximum pending connection length */
     while (1) {/* Loop forever */ /* Accept a client connection */
         clientFd = accept (registro, registroAddressPtr, &clientLen);
         if (fork () == 0) { /* Create child to send receipe */

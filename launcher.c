@@ -9,7 +9,7 @@ int main(int argc, char *argv[]){
     int pid1, pid2, pid3, wpid;
     char chiamata[20];
     printf("%s", argv[argc-1]);
-    if(strcmp(argv[argc-1], "RBC") != 0){
+    if(strcmp(argv[argc-2], "RBC") != 0){
         if ((pid1 = fork()) < 0) exit(EXIT_FAILURE); 
         else if (pid1 == 0) { /* child process */
             system("./registro");
