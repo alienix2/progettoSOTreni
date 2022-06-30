@@ -1,0 +1,27 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h> /* for fork */
+#include <sys/types.h> /* for pid_t */
+#include <sys/wait.h> /* for wait */
+
+int main(int argc, char *argv[]){
+    int pid1, pid2, pid3, wpid;
+    char chiamata[20];
+    printf("%s", argv[argc-1]);
+    if(strcmp(argv[argc-1], "RBC") != 0){
+        if ((pid1 = fork()) < 0) exit(EXIT_FAILURE); 
+        else if (pid1 == 0) { /* child process */
+            system("./registro");
+            exit(EXIT_SUCCESS);
+        }
+        if ((pid2 = fork()) < 0) exit(EXIT_FAILURE);
+        else if (pid2 == 0) {
+            sprintf(chiamata, "./treno %s", argv[1]);
+            system(chiamata);
+            exit(EXIT_SUCCESS);
+        }
+    }
+    else system("./rbc");
+    return 0;
+}
