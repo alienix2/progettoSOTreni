@@ -45,10 +45,12 @@ void contaTerminazioniHandler(){
 }
 
 void preliminariTerminazione(TRENO *trenoCorrente){ //Funzione richiamata dai figli che libera la memoria da itinerario e chiude i file di log
+    srand(getpid());    //Generatore di numeri random con seed pid del processo che lo richiama
     for(int i = 0; i<7; i++){
         free(trenoCorrente->itinerario[i]);
     }
     fclose(trenoCorrente->log);
+    usleep((rand()%1000000));   //Aspetto un tempo random prima di mandare la SIGUSR1 al padre
     kill(getppid(), SIGUSR1);
 }
 
@@ -226,7 +228,7 @@ int percorriItinerario(TRENO *trenoCorrente, int RBC){  //Funzione che scorre l'
     int numeroSegmentoProssimo; //Segmento a cui si dovrà accedere successivamente
     int numeroSegmentoAttuale;  //Segmento in cui ci troviamo
     aggiungiLog(*trenoCorrente,"Inizio il mio persorso, esco dalla stazione!");
-    for(trenoCorrente->posizioneAttuale = 0; trenoCorrente->posizioneAttuale < 6 && strcmp(trenoCorrente->itinerario[trenoCorrente->posizioneAttuale], "0") != 0; trenoCorrente->posizioneAttuale++){   //Tutti i treni eseguono 6 iterazioni
+    for(trenoCorrente->posizioneAttuale = 0; trenoCorrente->posizioneAttuale < 6 && strcmp(trenoCorrente->itinerario[trenoCorrente->posizioneAttuale+1], "0") != 0; trenoCorrente->posizioneAttuale++){   //Tutti i treni eseguono 6 iterazioni
         aggiungiLog(*trenoCorrente,"[ATTUALE:%s],[NEXT:%s]",trenoCorrente->itinerario[trenoCorrente->posizioneAttuale],trenoCorrente->itinerario[trenoCorrente->posizioneAttuale+1]);
         numeroSegmentoProssimo = atoi(trenoCorrente->itinerario[trenoCorrente->posizioneAttuale + 1] + 2);  //Restituisce il numero del segmento, con stazione restituisce 0
         numeroSegmentoAttuale = atoi(trenoCorrente->itinerario[trenoCorrente->posizioneAttuale] + 2);   //Restituisce il numero del segmento, con stazione restituisce 0

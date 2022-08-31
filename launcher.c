@@ -12,7 +12,8 @@ int main(int argc, char *argv[]){
     if(strcmp(argv[argc-2], "RBC") != 0){
         if ((pid1 = fork()) < 0) exit(EXIT_FAILURE); 
         else if (pid1 == 0) { /* child process */
-            system("./registro");
+            sprintf(chiamata, "./registro %s", argv[2]);
+            system("chiamata");
             exit(EXIT_SUCCESS);
         }
         if ((pid2 = fork()) < 0) exit(EXIT_FAILURE);

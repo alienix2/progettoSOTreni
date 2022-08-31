@@ -10,6 +10,57 @@
 #define DEFAULT_PROTOCOL 0
 
 //Registro di PROVA, ToDo quello vero
+void riempiUno(char *itinerario[6][7]){
+    itinerario[1][0] = "S1";
+    itinerario[1][1] = "MA1";
+    itinerario[1][2] = "MA2";
+    itinerario[1][3] = "MA3";
+    itinerario[1][4] = "MA8";
+    itinerario[1][5] = "S6";
+    itinerario[1][6] = "0";
+
+    itinerario[2][0] = "S2";
+    itinerario[2][1] = "MA5";
+    itinerario[2][2] = "MA6";
+    itinerario[2][3] = "MA7";
+    itinerario[2][4] = "MA3";
+    itinerario[2][5] = "MA8";
+    itinerario[2][6] = "S6";
+
+    itinerario[3][0] = "S7";
+    itinerario[3][1] = "MA13";
+    itinerario[3][2] = "MA12";
+    itinerario[3][3] = "MA11";
+    itinerario[3][4] = "MA10";
+    itinerario[3][5] = "MA9";
+    itinerario[3][6] = "S3";
+
+    itinerario[4][0] = "S4";
+    itinerario[4][1] = "MA14";
+    itinerario[4][2] = "MA15";
+    itinerario[4][3] = "MA16";
+    itinerario[4][4] = "MA12";
+    itinerario[4][5] = "S8";
+    itinerario[4][6] = "0";
+
+    itinerario[5][0] = "0";
+    itinerario[5][1] = "0";
+    itinerario[5][2] = "0";
+    itinerario[5][3] = "0";
+    itinerario[5][4] = "0";
+    itinerario[5][5] = "0";
+    itinerario[5][6] = "0";
+}
+
+void riempiDue(char *itinerario[6][7]){    //ToDo
+    itinerario[1][0] = "S0";
+    itinerario[1][1] = "MA1";
+    itinerario[1][2] = "MA2";
+    itinerario[1][3] = "MA3";
+    itinerario[1][4] = "MA4";
+    itinerario[1][5] = "MA5";
+    itinerario[1][6] = "S1";
+}
 
 int receiveNumero(int fd, int *numeroTreno) {
     recv(fd, numeroTreno, sizeof(*numeroTreno), 0);
@@ -17,21 +68,21 @@ int receiveNumero(int fd, int *numeroTreno) {
     printf("Ho ricevuto %d, PID:%d\n", *numeroTreno, getpid());
 }
 
-int sendItinerario(int fd, char **itinerario[5][7], int numeroTreno){
+int sendItinerario(int fd, char *itinerario[6][7], int numeroTreno){
     if(numeroTreno == 0){
         for(int k = 1; k<6; k++){
             for(int i = 0; i<7; i++){
-                send(fd, itinerario[1][i], strlen(itinerario[1][i])+1, 0); //DA MODIFICARE 1 CON k
+                send(fd, itinerario[k][i], strlen(itinerario[k][i])+1, 0);
             }
         }
     }
     else{
-        numeroTreno = 1; //DA ELIMINARE DOPO QUANDO SI METTONO LE MATRICI GIUSTE
+        //numeroTreno = 1; //DA ELIMINARE DOPO QUANDO SI METTONO LE MATRICI GIUSTE
         for(int i = 0; i<7; i++){
             send(fd, itinerario[numeroTreno][i], strlen(itinerario[numeroTreno][i])+1, 0);
+            printf("Stazione: %s\n", itinerario[numeroTreno][i]);
         }
     }
-    fflush(fd);
     return 0;
 }
 
@@ -44,13 +95,10 @@ int main (int argc, char *argv[]) {
     int numeroTreno;
 
     char *itinerario[6][7];
-    itinerario[1][0] = "S0";
-    itinerario[1][1] = "MA1";
-    itinerario[1][2] = "MA2";
-    itinerario[1][3] = "MA3";
-    itinerario[1][4] = "MA4";
-    itinerario[1][5] = "MA5";
-    itinerario[1][6] = "S1";
+    if(strcmp(argv[1], "MAPPA1") == 0){ //Selezione della mappa basata su parametro passato dal launcher
+        riempiUno(itinerario);
+    }
+    else riempiDue(itinerario);
 
     serverSockAddrPtr = (struct sockaddr*) &registroAddress;
     serverLen = sizeof (registroAddress);
@@ -59,15 +107,18 @@ int main (int argc, char *argv[]) {
   
     registro = socket (AF_UNIX, SOCK_STREAM, DEFAULT_PROTOCOL);
     registroAddress.sun_family = AF_UNIX; /* Set domain type */
+
     strcpy (registroAddress.sun_path, "RegistroTreni"); /* Set name */
     unlink ("RegistroTreni"); /* Remove file if it already exists */
+
     bind (registro, serverSockAddrPtr, serverLen);/*Create file*/
     listen (registro, 6); /* Maximum pending connection length */
+
     while (1) {/* Loop forever */ /* Accept a client connection */
         clientFd = accept (registro, registroAddressPtr, &clientLen);
         if (fork () == 0) { /* Create child to send receipe */
             receiveNumero(clientFd, &numeroTreno);
-            sendItinerario(clientFd, &itinerario, numeroTreno); //Da mettere al posto di 0 numeroTreno
+            sendItinerario(clientFd, itinerario, numeroTreno); //Da mettere al posto di 0 numeroTreno
         }else close(clientFd);/* Close the client descriptor */
     }
 }
