@@ -53,19 +53,50 @@ void riempiUno(char *itinerario[6][7]){
 }
 
 void riempiDue(char *itinerario[6][7]){    //ToDo
-    itinerario[1][0] = "S0";
-    itinerario[1][1] = "MA1";
-    itinerario[1][2] = "MA2";
-    itinerario[1][3] = "MA3";
-    itinerario[1][4] = "MA4";
-    itinerario[1][5] = "MA5";
-    itinerario[1][6] = "S1";
+    itinerario[1][0] = "S2";
+    itinerario[1][1] = "MA5";
+    itinerario[1][2] = "MA6";
+    itinerario[1][3] = "MA7";
+    itinerario[1][4] = "MA3";
+    itinerario[1][5] = "MA8";
+    itinerario[1][6] = "S6";
+
+    itinerario[2][0] = "S3";
+    itinerario[2][1] = "MA9";
+    itinerario[2][2] = "MA10";
+    itinerario[2][3] = "MA11";
+    itinerario[2][4] = "MA12";
+    itinerario[2][5] = "S8";
+    itinerario[2][6] = "0";
+
+    itinerario[3][0] = "S4";
+    itinerario[3][1] = "MA14";
+    itinerario[3][2] = "MA15";
+    itinerario[3][3] = "MA16";
+    itinerario[3][4] = "MA12";
+    itinerario[3][5] = "S8";
+    itinerario[3][6] = "0";
+
+    itinerario[4][0] = "S6";
+    itinerario[4][1] = "MA8";
+    itinerario[4][2] = "MA3";
+    itinerario[4][3] = "MA2";
+    itinerario[4][4] = "MA1";
+    itinerario[4][5] = "S1";
+    itinerario[4][6] = "0";
+
+    itinerario[5][0] = "S6";
+    itinerario[5][1] = "MA4";
+    itinerario[5][2] = "MA3";
+    itinerario[5][3] = "MA2";
+    itinerario[5][4] = "MA1";
+    itinerario[5][5] = "S1";
+    itinerario[5][6] = "0";
 }
 
 int receiveNumero(int fd, int *numeroTreno) {
     recv(fd, numeroTreno, sizeof(*numeroTreno), 0);
     *numeroTreno = ntohl(*numeroTreno);
-    printf("Ho ricevuto %d, PID:%d\n", *numeroTreno, getpid());
 }
 
 int sendItinerario(int fd, char *itinerario[6][7], int numeroTreno){
@@ -80,7 +111,6 @@ int sendItinerario(int fd, char *itinerario[6][7], int numeroTreno){
         //numeroTreno = 1; //DA ELIMINARE DOPO QUANDO SI METTONO LE MATRICI GIUSTE
         for(int i = 0; i<7; i++){
             send(fd, itinerario[numeroTreno][i], strlen(itinerario[numeroTreno][i])+1, 0);
-            printf("Stazione: %s\n", itinerario[numeroTreno][i]);
         }
     }
     return 0;
@@ -118,7 +148,12 @@ int main (int argc, char *argv[]) {
         clientFd = accept (registro, registroAddressPtr, &clientLen);
         if (fork () == 0) { /* Create child to send receipe */
             receiveNumero(clientFd, &numeroTreno);
-            sendItinerario(clientFd, itinerario, numeroTreno); //Da mettere al posto di 0 numeroTreno
-        }else close(clientFd);/* Close the client descriptor */
+            sendItinerario(clientFd, itinerario, numeroTreno);
+            exit(EXIT_SUCCESS);
+        }
+        else{
+            signal(SIGCHLD, SIG_IGN); 
+            close(clientFd);    /* Close the client descriptor */
+        }
     }
 }

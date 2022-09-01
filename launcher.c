@@ -13,14 +13,14 @@ int main(int argc, char *argv[]){
         if ((pid1 = fork()) < 0) exit(EXIT_FAILURE); 
         else if (pid1 == 0) { /* child process */
             sprintf(chiamata, "./registro %s", argv[2]);
-            system("chiamata");
-            exit(EXIT_SUCCESS);
+            system(chiamata);
+            exit;
         }
         if ((pid2 = fork()) < 0) exit(EXIT_FAILURE);
         else if (pid2 == 0) {
             sprintf(chiamata, "./treno %s", argv[1]);
             system(chiamata);
-            exit(EXIT_SUCCESS);
+            exit;
         }
     }
     else system("./rbc");

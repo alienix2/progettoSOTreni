@@ -174,6 +174,7 @@ int impegnaSegmentoETCS1(TRENO trenoCorrente, int numeroSegmento){  //Funzione p
         sem_post(semafori[numeroSegmento]);
         return -1;
     }
+    printf("TrenoCorrente: %d, Impegnato il segmento %d\n", trenoCorrente.numTreno, numeroSegmento);
     ftruncate(segmentiDescriptor[numeroSegmento], 0);   //Altrimenti eseguo correttamente una write di 0, eseguo una signal sul semaforo e ritorno 0
     lseek(segmentiDescriptor[numeroSegmento],0,SEEK_SET);
     write(segmentiDescriptor[numeroSegmento], "1", 1);
