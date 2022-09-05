@@ -15,7 +15,7 @@
 #include <sys/stat.h>
 
 char *itinerarioFolder = "./itinerario";    //Usato per poter cambiare a piacimento la directory per i file di testo MAX
-char *logFolder = "./logs"; //Usato per poter cambiare a piacimento la directory per i file di log
+char *logFolder = "./logs/treni"; //Usato per poter cambiare a piacimento la directory per i file di log
 //Le seguenti variabili sono inserite qui per evitare di doverle passare svariate volte fra le funzioni
 int segmentiDescriptor[17];
 int ETCS;
@@ -82,7 +82,7 @@ void riceviPid(int fd, int *pid){
     if(recv(fd, pid, sizeof(int), 0) < 0){
         perror("recv");
     }
-    pid = htonl(pid);
+    *pid = ntohl(*pid);
     close(fd);
 }
 
@@ -260,7 +260,6 @@ int main(int argc, char *argv[]) {
         creaSocket(&RBC, &RBCAddress, &RBCLen, "ServerRBC");
         connetti(trenoCorrente, RBC, RBCAddressPtr, RBCLen);
         riceviPid(RBC, &RBCPid);
-        printf("%d\n", RBCPid);
     }
     for(int i = 1; i<6; i++){
         if((pid[i] = fork()) < 0) exit(EXIT_FAILURE);
@@ -270,11 +269,6 @@ int main(int argc, char *argv[]) {
             aggiungiLog(trenoCorrente,"Inizio del logging, mi connetto a RegistroTreni");
             creaSocket(&registro, &registroAddress, &registroLen, "RegistroTreni");
             connetti(trenoCorrente, registro, registroAddressPtr, registroLen);
-            if(ETCS == 2){ //Da rivedere
-                aggiungiLog(trenoCorrente,"Mi connetto a RBC");
-                creaSocket(&RBC, &RBCAddress, &RBCLen, "RBC");
-                connetti(trenoCorrente, RBC, RBCAddressPtr, RBCLen);
-            }
             inviaNumero(registro, trenoCorrente);
             riceviItinerario(registro, &trenoCorrente);
             if(strcmp(trenoCorrente.itinerario[trenoCorrente.posizioneAttuale], "0") != 0){

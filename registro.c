@@ -153,7 +153,7 @@ int main (int argc, char *argv[]) {
         }
         else{
             signal(SIGCHLD, SIG_IGN); 
-            close(clientFd);    /* Close the client descriptor */
+            close(clientFd);/* Close the client descriptor */
         }
     }
 }
