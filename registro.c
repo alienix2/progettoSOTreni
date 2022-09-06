@@ -85,7 +85,7 @@ void riempiDue(char *itinerario[6][7]){    //ToDo
     itinerario[4][5] = "S1";
     itinerario[4][6] = "0";
 
-    itinerario[5][0] = "S6";
+    itinerario[5][0] = "S5";
     itinerario[5][1] = "MA4";
     itinerario[5][2] = "MA3";
     itinerario[5][3] = "MA2";

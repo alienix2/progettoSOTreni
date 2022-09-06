@@ -63,7 +63,7 @@ void terminaProcessi(int pid[7]){   //Funzione richiamata dal padre, chiude tutt
     for(int i = 1; i<6; i++){
         kill(pid[i], SIGTERM);
     }
-    if(ETCS == 2) kill(pid[6], SIGTERM);
+    if(ETCS == 2) kill(pid[7], SIGUSR2);
 }
 
 void aggiungiLog(TRENO trenoCorrente, const char *fmt, ...){    //Aggiunge la stringa con parametri al giusto file di log
@@ -126,7 +126,7 @@ void creaSocket(int *server, struct sockaddr_un *serverAddress, int *serverLen, 
 void connetti(TRENO trenoCorrente, int server, struct sockaddr *serverAddressPtr, int serverLen){   //Funzione che crea una connessione coi dati che riceve come parametri
     int risultato;
     do { /* Loop until a connection is made with the server */
-        risultato = connect (server, serverAddressPtr, serverLen);
+        risultato = connect(server, serverAddressPtr, serverLen);
         if (risultato == -1){
             aggiungiLog(trenoCorrente, "Connessione non riuscita con il server %s, riprovo in 3 secondi!", serverAddressPtr->sa_data);
 	        sleep (3); /* Wait and then try again */
@@ -134,6 +134,16 @@ void connetti(TRENO trenoCorrente, int server, struct sockaddr *serverAddressPtr
     } while (risultato == -1);
     aggiungiLog(trenoCorrente, "Connessione stabilita con il server %s", serverAddressPtr->sa_data);
 }
+
+void connettiRBC(TRENO trenoCorrente, int *RBC){
+    int RBCLen;
+    struct sockaddr_un RBCAddress;  //Indirizzo di RBC
+    struct sockaddr* RBCAddressPtr = (struct RBCAddressPtr*) &RBCAddress; //Puntatore all'inidirizzo di RBC
+    creaSocket(RBC, &RBCAddress, &RBCLen, "ServerRBC");
+    connetti(trenoCorrente, *RBC, RBCAddressPtr, RBCLen);
+    printf("NumeroTreno:%d ho superato connetti\n", trenoCorrente.numTreno);
+}
+
 
 void inviaNumero(int fd, TRENO trenoCorrente){  //Invia un numero sul canale
     int numero = htonl(trenoCorrente.numTreno);
@@ -174,7 +184,6 @@ int impegnaSegmentoETCS1(TRENO trenoCorrente, int numeroSegmento){  //Funzione p
         sem_post(semafori[numeroSegmento]);
         return -1;
     }
-    printf("TrenoCorrente: %d, Impegnato il segmento %d\n", trenoCorrente.numTreno, numeroSegmento);
     ftruncate(segmentiDescriptor[numeroSegmento], 0);   //Altrimenti eseguo correttamente una write di 0, eseguo una signal sul semaforo e ritorno 0
     lseek(segmentiDescriptor[numeroSegmento],0,SEEK_SET);
     write(segmentiDescriptor[numeroSegmento], "1", 1);
@@ -182,24 +191,42 @@ int impegnaSegmentoETCS1(TRENO trenoCorrente, int numeroSegmento){  //Funzione p
     return 0;
 }
 
-int impegnaSegmentoETCS2(TRENO trenoCorrente, int numeroSegmento, int RBC){ //Funzione per la gestione di ETCS2 *ToDo in parte?*
-    char occupato[1];
-    printf("Sono qui! in impegna\n");
-    send(RBC, &trenoCorrente.itinerario[trenoCorrente.posizioneProssima], sizeof(trenoCorrente.itinerario[trenoCorrente.posizioneAttuale]), 0);
-    printf("Sono dopo la send\n");
-    recv(RBC, occupato, 1, 0);
-    if(strcmp(occupato, "1") == 0){
+int impegnaSegmentoETCS2(TRENO trenoCorrente, int numeroSegmento, int RBC, int invio){ //Funzione per la gestione di ETCS2 *ToDo in parte?*
+    int occupato = 0;
+    connettiRBC(trenoCorrente, &RBC);
+    send(RBC, &invio, sizeof(int), 0);
+    send(RBC, &trenoCorrente.numTreno, sizeof(int), 0);
+    if(numeroSegmento != 0) send(RBC, &numeroSegmento, sizeof(int), 0);  //Per mandare il numero di segmento corretto in caso di stazione
+    else {
+        invio = (atoi(trenoCorrente.itinerario[trenoCorrente.posizioneAttuale + 1] + 1) + 20);
+        send(RBC, &invio, sizeof(int), 0);  //Aggiungo 20 per distinguerle dai segmenti normali
+    }
+    printf("Ho inviato il segmento!\n");
+    recv(RBC, &occupato, 1, 0);
+    close(RBC);
+    printf("Occupato?: %d", occupato);
+    if(occupato == 1){
         return -1;
     }
     aggiungiLog(trenoCorrente, "Permesso accordato da RBC!");
     return 0;
 }
 
-void liberaSegmento(TRENO trenoCorrente, int numeroSegmento, int RBC){  //Funzione che libera il segmento corrente
+void liberaSegmento(TRENO trenoCorrente, int numeroSegmento, int RBC, int invio){  //Funzione che libera il segmento corrente
     ftruncate(segmentiDescriptor[numeroSegmento], 0);   //Tronco il file
     lseek(segmentiDescriptor[numeroSegmento], 0, SEEK_SET); //Vado alla posizione 0 e scrivo 0
     write(segmentiDescriptor[numeroSegmento], "0", 1); //Il disimpegno è fatto senza preoccupazioni perchè si presuppone che nel peggiore dei casi porti ad una lettura in più
-    if(ETCS == 2) send(RBC, &trenoCorrente.itinerario[trenoCorrente.posizioneAttuale], sizeof(trenoCorrente.itinerario[trenoCorrente.posizioneAttuale]),  0); //Libero anche in RBC
+    if(ETCS == 2){  //Libero in RBC se ETCS == 2
+        connettiRBC(trenoCorrente, &RBC);
+        send(RBC, &invio, sizeof(int), 0);
+        send(RBC, &trenoCorrente.numTreno, sizeof(int), 0);
+        if(numeroSegmento != 0) send(RBC, &numeroSegmento, sizeof(int), 0);  //Per mandare il numero di segmento corretto in caso di stazione
+        else {
+            invio = (atoi(trenoCorrente.itinerario[trenoCorrente.posizioneAttuale] + 1) + 20);
+            send(RBC, &invio, sizeof(int), 0);  //Aggiungo 20 per distinguerle dai segmenti normali
+        }
+        close(RBC);
+    }
     aggiungiLog(trenoCorrente, "Segmento precedente liberato con successo!");
 }
 
@@ -212,7 +239,7 @@ void eseguiStep(TRENO trenoCorrente, int numeroSegmentoProssimo, int RBC){  //Fu
             if(ETCS == 1) sleep(2);
         }
         if(ETCS == 2){  //Se sono in ETCS2 eseguo ulteriori controlli
-            if((successo2 = impegnaSegmentoETCS2(trenoCorrente, numeroSegmentoProssimo, RBC)) != 0){    //Come per impegnaSegmentoETCS1 ritorna -1 se il segmento è occupato
+            if((successo2 = impegnaSegmentoETCS2(trenoCorrente, numeroSegmentoProssimo, RBC, 1)) != 0){    //Come per impegnaSegmentoETCS1 ritorna -1 se il segmento è occupato
                 aggiungiLog(trenoCorrente, "RBC rifiuta l'accesso");
                 sleep(2);
             }
@@ -234,7 +261,7 @@ int percorriItinerario(TRENO *trenoCorrente, int RBC){  //Funzione che scorre l'
         numeroSegmentoProssimo = atoi(trenoCorrente->itinerario[trenoCorrente->posizioneAttuale + 1] + 2);  //Restituisce il numero del segmento, con stazione restituisce 0
         numeroSegmentoAttuale = atoi(trenoCorrente->itinerario[trenoCorrente->posizioneAttuale] + 2);   //Restituisce il numero del segmento, con stazione restituisce 0
         eseguiStep(*trenoCorrente, numeroSegmentoProssimo, RBC);
-        liberaSegmento(*trenoCorrente, numeroSegmentoAttuale, RBC);
+        liberaSegmento(*trenoCorrente, numeroSegmentoAttuale, RBC, 0);
         sleep(2);
     }
     aggiungiLog(*trenoCorrente,"Concludo il mio percorso, sono in stazione!");
@@ -244,7 +271,7 @@ int main(int argc, char *argv[]) {
     int pid[7];
     signal(SIGUSR1, contaTerminazioniHandler);
     int registro, registroLen;
-    int RBC, RBCLen, RBCPid;
+    int RBC, RBCLen;
     TRENO trenoCorrente;
     ETCS = atoi(argv[1] + 4); //Interpreto la X nella scritta "ETCSX"
     struct sockaddr_un registroAddress; //Indirizzo del registro
@@ -259,7 +286,7 @@ int main(int argc, char *argv[]) {
     if(ETCS == 2){
         creaSocket(&RBC, &RBCAddress, &RBCLen, "ServerRBC");
         connetti(trenoCorrente, RBC, RBCAddressPtr, RBCLen);
-        riceviPid(RBC, &RBCPid);
+        riceviPid(RBC, &pid[7]);
     }
     for(int i = 1; i<6; i++){
         if((pid[i] = fork()) < 0) exit(EXIT_FAILURE);
@@ -288,5 +315,6 @@ int main(int argc, char *argv[]) {
     while(terminato < 5) pause(); //In attesa di 5 segnali
     terminaProcessi(pid);
     aggiungiLog(trenoCorrente, "Tutti i treni sono arrivati a destinazione, termino");
+    fclose(trenoCorrente.log);
     return 0;
 }
