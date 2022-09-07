@@ -82,7 +82,6 @@ int receiveNumero(int fd) {
     int numero;
     recv(fd, &numero, sizeof(numero), 0);
     numero = ntohl(numero);
-    printf("Ho ricevuto %d, PID:%d\n", numero, getpid());
 }
 
 void riceviItinerari (int fd, char *itinerari[6][7]) {  //Ricevo 7 stringhe e le metto correttamente all'interno dell'itinerario del treno
@@ -130,10 +129,8 @@ void gestisciAccesso(int clientFd, int segmenti[17], int stazioni[9]){
     int numeroSegmento;
     int invio;
     recv(clientFd, &numeroTreno, sizeof(int), 0);   //Ricevo il numero del treno per composizione log
-    printf("Ho ricevuto il numero del treno!: %d\n", numeroTreno);
     recv(clientFd, &numeroSegmento, sizeof(int), 0);    //Ricevo la posizione dove intende accedere
     perror("recv");
-    printf("Ho ricevuto il tipo di richiesta!\n");
     if(numeroSegmento > 20) stazioni[numeroSegmento - 20]++;
     else if(segmenti[numeroSegmento] == 0){
         invio = 0;
@@ -161,12 +158,9 @@ void gestisciAbbandono(int clientFd, int segmenti[17], int stazioni[8]){
 void gestisciRichiesta(int RBC, struct sockaddr *RBCAddressPtr, int clientLen, int segmenti[17], int stazioni[8]){
     int richiesta;
     int clientFd = accept (RBC, RBCAddressPtr, &clientLen); //Accetto una connessione
-    printf("Ho accettato una connessione!\n");
     recv(clientFd, &richiesta, sizeof(int), 0); //Ricevo il numero della richiesta, 1 accesso, 0 abbandono
-    printf("Richiesta ricevuta: %d\n", richiesta);
     if(richiesta == 1) gestisciAccesso(clientFd, segmenti, stazioni);   //1 accesso
     else gestisciAbbandono(clientFd, segmenti, stazioni);   //0 abbandono
-    printf("Ho gestito la richiesta!\n");
     close(clientFd);    //Chiudo il file descriptor del client
 }
 
