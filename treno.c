@@ -82,7 +82,6 @@ void riceviPid(int fd, int *pid){
     if(recv(fd, pid, sizeof(int), 0) < 0){
         perror("recv");
     }
-    *pid = ntohl(*pid);
     close(fd);
 }
 
@@ -115,7 +114,7 @@ void creaLog(TRENO *trenoCorrente){ //Funzione che crea un log partendo dal nume
     }
 }
 
-void creaSocket(int *server, struct sockaddr_un *serverAddress, int *serverLen, char* nomeServer){  //Funzione che crea una socket partendo dai dati che riceve come parametri
+void accediSocket(int *server, struct sockaddr_un *serverAddress, int *serverLen, char* nomeServer){  //Funzione che crea una socket partendo dai dati che riceve come parametri
     *serverLen = sizeof(*serverAddress);
     *server = socket(AF_UNIX, SOCK_STREAM, 0);
     struct sockaddr_un tmp = {.sun_family = AF_UNIX};
@@ -138,14 +137,14 @@ void connetti(TRENO trenoCorrente, int server, struct sockaddr *serverAddressPtr
 void connettiRBC(TRENO trenoCorrente, int *RBC){
     int RBCLen;
     struct sockaddr_un RBCAddress;  //Indirizzo di RBC
-    struct sockaddr* RBCAddressPtr = (struct RBCAddressPtr*) &RBCAddress; //Puntatore all'inidirizzo di RBC
-    creaSocket(RBC, &RBCAddress, &RBCLen, "ServerRBC");
+    struct sockaddr* RBCAddressPtr = (struct sockaddr*) &RBCAddress; //Puntatore all'inidirizzo di RBC
+    accediSocket(RBC, &RBCAddress, &RBCLen, "ServerRBC");
     connetti(trenoCorrente, *RBC, RBCAddressPtr, RBCLen);
 }
 
 
 void inviaNumero(int fd, TRENO trenoCorrente){  //Invia un numero sul canale
-    int numero = htonl(trenoCorrente.numTreno);
+    int numero = trenoCorrente.numTreno;
     while(send(fd, &numero, sizeof(numero), 0) < 0){
         aggiungiLog(trenoCorrente, "ERRORE: send non andata a buon fine, riprovo fra 2 secondi");
         sleep(2);
@@ -194,6 +193,7 @@ int impegnaSegmentoETCS2(TRENO trenoCorrente, int numeroSegmento, int RBC, int i
     int occupato = 0;
     connettiRBC(trenoCorrente, &RBC);
     send(RBC, &invio, sizeof(int), 0);
+    printf("%s\n", trenoCorrente.itinerario[trenoCorrente.posizioneAttuale + 1]);
     send(RBC, &trenoCorrente.numTreno, sizeof(int), 0);
     if(numeroSegmento != 0) send(RBC, &numeroSegmento, sizeof(int), 0);  //Per mandare il numero di segmento corretto in caso di stazione
     else {
@@ -272,16 +272,16 @@ int main(int argc, char *argv[]) {
     TRENO trenoCorrente;
     ETCS = atoi(argv[1] + 4); //Interpreto la X nella scritta "ETCSX"
     struct sockaddr_un registroAddress; //Indirizzo del registro
-    struct sockaddr* registroAddressPtr = (struct registroAddressPtr*) &registroAddress; //Puntatore all'indirizzo del registro
+    struct sockaddr* registroAddressPtr = (struct sockaddr*) &registroAddress; //Puntatore all'indirizzo del registro
     struct sockaddr_un RBCAddress;  //Indirizzo di RBC
-    struct sockaddr* RBCAddressPtr = (struct RBCAddressPtr*) &RBCAddress; //Puntatore all'inidirizzo di RBC
+    struct sockaddr* RBCAddressPtr = (struct sockaddr*) &RBCAddress; //Puntatore all'inidirizzo di RBC
 
     trenoCorrente.numTreno = 0;
     creaLog(&trenoCorrente);
     creaSegmenti();
     inizializzaSemafori();
     if(ETCS == 2){
-        creaSocket(&RBC, &RBCAddress, &RBCLen, "ServerRBC");
+        accediSocket(&RBC, &RBCAddress, &RBCLen, "ServerRBC");
         connetti(trenoCorrente, RBC, RBCAddressPtr, RBCLen);
         riceviPid(RBC, &pid[7]);
     }
@@ -291,7 +291,7 @@ int main(int argc, char *argv[]) {
             trenoCorrente.numTreno = i;
             creaLog(&trenoCorrente);
             aggiungiLog(trenoCorrente,"Inizio del logging, mi connetto a RegistroTreni");
-            creaSocket(&registro, &registroAddress, &registroLen, "RegistroTreni");
+            accediSocket(&registro, &registroAddress, &registroLen, "RegistroTreni");
             connetti(trenoCorrente, registro, registroAddressPtr, registroLen);
             inviaNumero(registro, trenoCorrente);
             riceviItinerario(registro, &trenoCorrente);

@@ -9,17 +9,13 @@
 #include <sys/socket.h>
 #include <sys/shm.h>
 #include <semaphore.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/un.h> /* For AFUNIX sockets */
 #define DEFAULT_PROTOCOL 0
 
 char *logFolder = "./logs/RBC";
 FILE *logFile;
-
-void terminaProcessoHandler(){
-    aggiungiLog("Sono stato terminato con successo da padreTreni!");
-    fclose(logFile);
-    exit(EXIT_SUCCESS);
-}
 
 char *getTime(char *data){  //Funzione di servizio per ottenere la data nel formato desiderato
     time_t tempo;
@@ -48,7 +44,12 @@ void creaLog(){ //Funzione che crea un log partendo dal numeroTreno del treno ch
     logFile = fopen(nomeLog, "w");
 }
 
-//RBC di PROVA, ToDo quello vero
+void terminaProcessoHandler(){
+    aggiungiLog("Sono stato terminato con successo da padreTreni!");
+    fclose(logFile);
+    exit(EXIT_SUCCESS);
+}
+
 void leggiElemento (int fd, char *str) {   //Funzione generica per ricevere un numero non definito di caratteri
     do {
         while(recv (fd, str, 1, 0) < 0){
@@ -81,7 +82,6 @@ void connetti(int server, struct sockaddr *serverAddressPtr, int serverLen){   /
 int receiveNumero(int fd) {
     int numero;
     recv(fd, &numero, sizeof(numero), 0);
-    numero = ntohl(numero);
 }
 
 void riceviItinerari (int fd, char *itinerari[6][7]) {  //Ricevo 7 stringhe e le metto correttamente all'interno dell'itinerario del treno
@@ -98,7 +98,7 @@ void riceviItinerari (int fd, char *itinerari[6][7]) {  //Ricevo 7 stringhe e le
 }
 
 void inviaNumero(int fd){  //Invia un numero sul canale
-    int numero = htonl(0);
+    int numero = 0;
     while(send(fd, &numero, sizeof(numero), 0) < 0){
         sleep(2);
     }
@@ -116,7 +116,7 @@ void impostaStazioni(char *itinerari[6][7], int stazioni[9]){
 void inviaPid(int RBC, struct sockaddr *RBCAddressPtr, int clientLen){
     int invio;
     int clientFd = accept (RBC, RBCAddressPtr, &clientLen);
-    invio = htonl(getpid());
+    invio = getpid();
     while(send(clientFd, &invio, sizeof(invio), 0) < 0){
         sleep(2);   //In caso di fallimento
     }
@@ -130,7 +130,6 @@ void gestisciAccesso(int clientFd, int segmenti[17], int stazioni[9]){
     int invio;
     recv(clientFd, &numeroTreno, sizeof(int), 0);   //Ricevo il numero del treno per composizione log
     recv(clientFd, &numeroSegmento, sizeof(int), 0);    //Ricevo la posizione dove intende accedere
-    perror("recv");
     if(numeroSegmento > 20) stazioni[numeroSegmento - 20]++;
     else if(segmenti[numeroSegmento] == 0){
         invio = 0;
@@ -150,9 +149,15 @@ void gestisciAbbandono(int clientFd, int segmenti[17], int stazioni[8]){
     int numeroSegmento;
     recv(clientFd, &numeroTreno, sizeof(int), 0);   //Ricevo il numero del treno per composizione log
     recv(clientFd, &numeroSegmento, sizeof(int), 0);    //Ricevo la posizione che lascia
-    if(numeroSegmento > 20) stazioni[numeroSegmento - 20]--;
-    else segmenti[numeroSegmento]--;
-    aggiungiLog("Il treno numero:%d ha lasciato il segmento:MA%d", numeroTreno, numeroSegmento);
+    if(numeroSegmento > 20) {
+        aggiungiLog("Il treno numero:%d ha lasciato la stazione:S%d", numeroTreno, (numeroSegmento-20));
+        stazioni[numeroSegmento - 20]--;
+    }
+    else {
+        aggiungiLog("Il treno numero:%d ha lasciato il segmento:MA%d", numeroTreno, numeroSegmento);
+        segmenti[numeroSegmento]--;
+    }
+    
 }
 
 void gestisciRichiesta(int RBC, struct sockaddr *RBCAddressPtr, int clientLen, int segmenti[17], int stazioni[8]){
@@ -176,10 +181,10 @@ int main (void) {
     struct sockaddr* serverSockAddrPtr; /*Ptr to server address*/
     struct sockaddr_un clientUNIXAddress; /*Client address */
     struct sockaddr_un RBCAddress; //Indirizzo del registro
-    struct sockaddr* RBCAddressPtr = (struct registroAddressPtr*) &RBCAddress; //Puntatore all'indirizzo del registro
+    struct sockaddr* RBCAddressPtr = (struct sockaddr*) &RBCAddress; //Puntatore all'indirizzo del registro
 
     struct sockaddr_un registroAddress; //Indirizzo del registro
-    struct sockaddr* registroAddressPtr = (struct registroAddressPtr*) &registroAddress; //Puntatore all'indirizzo del registro
+    struct sockaddr* registroAddressPtr = (struct sockaddr*) &registroAddress; //Puntatore all'indirizzo del registro
 
     serverSockAddrPtr = (struct sockaddr*) &RBCAddress;
     serverLen = sizeof (RBCAddress);
@@ -193,6 +198,12 @@ int main (void) {
     inviaNumero(registro);
     riceviItinerari(registro, itinerari);
     impostaStazioni(itinerari, stazioni);
+
+    for(int k = 1; k<6; k++){
+        for(int i = 0; i<7; i++){
+            printf("%s\n", itinerari[k][i]);
+        }
+    }
 
     RBC = socket (AF_UNIX, SOCK_STREAM, DEFAULT_PROTOCOL);
     RBCAddress.sun_family = AF_UNIX; // Set domain type

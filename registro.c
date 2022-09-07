@@ -95,8 +95,8 @@ void riempiDue(char *itinerario[6][7]){    //ToDo
 }
 
 int receiveNumero(int fd, int *numeroTreno) {
-    recv(fd, numeroTreno, sizeof(*numeroTreno), 0);
-    *numeroTreno = ntohl(*numeroTreno);
+    recv(fd, numeroTreno, sizeof(numeroTreno), 0);
+    printf("Numero treno: %d\n", *numeroTreno);
 }
 
 int sendItinerario(int fd, char *itinerario[6][7], int numeroTreno){
@@ -108,7 +108,6 @@ int sendItinerario(int fd, char *itinerario[6][7], int numeroTreno){
         }
     }
     else{
-        //numeroTreno = 1; //DA ELIMINARE DOPO QUANDO SI METTONO LE MATRICI GIUSTE
         for(int i = 0; i<7; i++){
             send(fd, itinerario[numeroTreno][i], strlen(itinerario[numeroTreno][i])+1, 0);
         }
