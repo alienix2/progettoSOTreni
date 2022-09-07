@@ -141,7 +141,6 @@ void connettiRBC(TRENO trenoCorrente, int *RBC){
     struct sockaddr* RBCAddressPtr = (struct RBCAddressPtr*) &RBCAddress; //Puntatore all'inidirizzo di RBC
     creaSocket(RBC, &RBCAddress, &RBCLen, "ServerRBC");
     connetti(trenoCorrente, *RBC, RBCAddressPtr, RBCLen);
-    printf("NumeroTreno:%d ho superato connetti\n", trenoCorrente.numTreno);
 }
 
 
@@ -201,10 +200,8 @@ int impegnaSegmentoETCS2(TRENO trenoCorrente, int numeroSegmento, int RBC, int i
         invio = (atoi(trenoCorrente.itinerario[trenoCorrente.posizioneAttuale + 1] + 1) + 20);
         send(RBC, &invio, sizeof(int), 0);  //Aggiungo 20 per distinguerle dai segmenti normali
     }
-    printf("Ho inviato il segmento!\n");
     recv(RBC, &occupato, 1, 0);
     close(RBC);
-    printf("Occupato?: %d", occupato);
     if(occupato == 1){
         return -1;
     }
