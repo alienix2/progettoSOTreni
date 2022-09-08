@@ -14,29 +14,9 @@
 #include <sys/un.h> /* For AFUNIX sockets */
 #define DEFAULT_PROTOCOL 0
 
+#include "./utilities/sharedLibraries.h"
+
 char *logFolder = "./logs/RBC";
-FILE *logFile;
-
-char *getTime(char *data){  //Funzione di servizio per ottenere la data nel formato desiderato
-    time_t tempo;
-    struct tm *info;
-    time(&tempo);
-    info = localtime(&tempo);
-    strftime(data,50,",\t%x - %X\n", info);
-    return data;
-}
-
-void aggiungiLog(const char *fmt, ...){    //Aggiunge la stringa con parametri al file di log fi RBC
-    va_list args;
-    char messaggioLog[100];
-    char data[50];
-    va_start(args, fmt);
-    vsnprintf(messaggioLog, 100, fmt, args);
-    va_end(args);
-    strcat(messaggioLog, getTime(data));
-    fputs(messaggioLog, logFile);
-    fflush(logFile);
-}
 
 void creaLog(){ //Funzione che crea un log partendo dal numeroTreno del treno che la invoca
     char nomeLog[20];
@@ -50,35 +30,6 @@ void terminaProcessoHandler(){
     exit(EXIT_SUCCESS);
 }
 
-void leggiElemento (int fd, char *str) {   //Funzione generica per ricevere un numero non definito di caratteri
-    do {
-        while(recv (fd, str, 1, 0) < 0){
-            sleep(2);
-       }
-    }while (*str++ != '\0');
-}
-
-void accediSocket(int *server, struct sockaddr_un *serverAddress, int *serverLen, char* nomeServer){  //Funzione che crea una socket partendo dai dati che riceve come parametri
-    *serverLen = sizeof(*serverAddress);
-    *server = socket(AF_UNIX, SOCK_STREAM, 0);
-    struct sockaddr_un tmp = {.sun_family = AF_UNIX};
-    strcpy (tmp.sun_path, nomeServer);
-    *serverAddress = tmp;
-}
-
-void connetti(int server, struct sockaddr *serverAddressPtr, int serverLen){   //Funzione che crea una connessione coi dati che riceve come parametri
-    int risultato;
-    do { /* Loop until a connection is made with the server */
-        risultato = connect (server, serverAddressPtr, serverLen);
-        if (risultato == -1){
-            aggiungiLog("Connessione non riuscita con il server %s, riprovo in 3 secondi!", serverAddressPtr->sa_data);
-	        sleep (3); /* Wait and then try again */
-        }
-    } while (risultato == -1);
-    aggiungiLog("Connessione stabilita con il server %s", serverAddressPtr->sa_data);
-}
-
-
 int receiveNumero(int fd) {
     int numero;
     recv(fd, &numero, sizeof(numero), 0);
@@ -86,8 +37,6 @@ int receiveNumero(int fd) {
 
 void riceviItinerari (int fd, char *itinerari[6][7]) {  //Ricevo 7 stringhe e le metto correttamente all'interno dell'itinerario del treno
     char str[200];
-    int i = 0;
-    char *prova[7];
     for(int k = 1; k<6; k++){
         for(int i = 0; i<7; i++){
             leggiElemento(fd, str);
@@ -118,7 +67,8 @@ void inviaPid(int RBC, struct sockaddr *RBCAddressPtr, int clientLen){
     int clientFd = accept (RBC, RBCAddressPtr, &clientLen);
     invio = getpid();
     while(send(clientFd, &invio, sizeof(invio), 0) < 0){
-        sleep(2);   //In caso di fallimento
+        aggiungiLog("ERRORE: PID non inviato con successo a padreTreni, ritento in 3 secondi");
+        sleep(3);   //In caso di fallimento
     }
     aggiungiLog("PID inviato con successo a padreTreni per la terminazione finale");
     close(clientFd);
@@ -198,12 +148,6 @@ int main (void) {
     inviaNumero(registro);
     riceviItinerari(registro, itinerari);
     impostaStazioni(itinerari, stazioni);
-
-    for(int k = 1; k<6; k++){
-        for(int i = 0; i<7; i++){
-            printf("%s\n", itinerari[k][i]);
-        }
-    }
 
     RBC = socket (AF_UNIX, SOCK_STREAM, DEFAULT_PROTOCOL);
     RBCAddress.sun_family = AF_UNIX; // Set domain type

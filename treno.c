@@ -14,6 +14,9 @@
 #include <sys/un.h> 
 #include <sys/stat.h>
 
+#include "./utilities/sharedLibraries.h"
+
+
 char *itinerarioFolder = "./itinerario";    //Usato per poter cambiare a piacimento la directory per i file di testo MAX
 char *logFolder = "./logs/treni"; //Usato per poter cambiare a piacimento la directory per i file di log
 //Le seguenti variabili sono inserite qui per evitare di doverle passare svariate volte fra le funzioni
@@ -30,15 +33,6 @@ typedef struct{ //Struct che decrive lo stato di un treno
     char *itinerario[7];
     FILE *log;
 }TRENO;
-
-char *getTime(char *data){  //Funzione di servizio per ottenere la data nel formato desiderato
-    time_t tempo;
-    struct tm *info;
-    time(&tempo);
-    info = localtime(&tempo);
-    strftime(data,50,",\t%x - %X\n", info);
-    return data;
-}
 
 void contaTerminazioniHandler(){
     terminato++;
@@ -66,22 +60,12 @@ void terminaProcessi(int pid[7]){   //Funzione richiamata dal padre, chiude tutt
     if(ETCS == 2) kill(pid[7], SIGUSR2);
 }
 
-void aggiungiLog(TRENO trenoCorrente, const char *fmt, ...){    //Aggiunge la stringa con parametri al giusto file di log
-    va_list args;
-    char messaggioLog[100];
-    char data[50];
-    va_start(args, fmt);
-    vsnprintf(messaggioLog, 100, fmt, args);
-    va_end(args);
-    strcat(messaggioLog, getTime(data));
-    fputs(messaggioLog, trenoCorrente.log);
-    fflush(trenoCorrente.log);
-}
-
 void riceviPid(int fd, int *pid){
     if(recv(fd, pid, sizeof(int), 0) < 0){
-        perror("recv");
+        aggiungiLog("ERRORE: Pid non ricevuto con successo, ritento in 3 secondi");
+        sleep(3);
     }
+    aggiungiLog("Pid ricevuto con successo, sono in grado di terminare RBC a fine programma");
     close(fd);
 }
 
@@ -114,66 +98,37 @@ void creaLog(TRENO *trenoCorrente){ //Funzione che crea un log partendo dal nume
     }
 }
 
-void accediSocket(int *server, struct sockaddr_un *serverAddress, int *serverLen, char* nomeServer){  //Funzione che crea una socket partendo dai dati che riceve come parametri
-    *serverLen = sizeof(*serverAddress);
-    *server = socket(AF_UNIX, SOCK_STREAM, 0);
-    struct sockaddr_un tmp = {.sun_family = AF_UNIX};
-    strcpy (tmp.sun_path, nomeServer);
-    *serverAddress = tmp;
-}
-
-void connetti(TRENO trenoCorrente, int server, struct sockaddr *serverAddressPtr, int serverLen){   //Funzione che crea una connessione coi dati che riceve come parametri
-    int risultato;
-    do { /* Loop until a connection is made with the server */
-        risultato = connect(server, serverAddressPtr, serverLen);
-        if (risultato == -1){
-            aggiungiLog(trenoCorrente, "Connessione non riuscita con il server %s, riprovo in 3 secondi!", serverAddressPtr->sa_data);
-	        sleep (3); /* Wait and then try again */
-        }
-    } while (risultato == -1);
-    aggiungiLog(trenoCorrente, "Connessione stabilita con il server %s", serverAddressPtr->sa_data);
-}
-
 void connettiRBC(TRENO trenoCorrente, int *RBC){
     int RBCLen;
     struct sockaddr_un RBCAddress;  //Indirizzo di RBC
     struct sockaddr* RBCAddressPtr = (struct sockaddr*) &RBCAddress; //Puntatore all'inidirizzo di RBC
     accediSocket(RBC, &RBCAddress, &RBCLen, "ServerRBC");
-    connetti(trenoCorrente, *RBC, RBCAddressPtr, RBCLen);
+    connetti(*RBC, RBCAddressPtr, RBCLen);
 }
 
 
 void inviaNumero(int fd, TRENO trenoCorrente){  //Invia un numero sul canale
     int numero = trenoCorrente.numTreno;
     while(send(fd, &numero, sizeof(numero), 0) < 0){
-        aggiungiLog(trenoCorrente, "ERRORE: send non andata a buon fine, riprovo fra 2 secondi");
+        aggiungiLog("ERRORE: send non andata a buon fine, riprovo fra 2 secondi");
         sleep(2);
     }
-}
-
-void leggiElemento (int fd, char *str, TRENO trenoCorrente) {   //Funzione generica per ricevere un numero non definito di caratteri
-    do {
-        while(recv (fd, str, 1, 0) < 0){
-            aggiungiLog(trenoCorrente, "ERRORE: receive non andata a buon fine, riprovo fra 2 secondi");
-            sleep(2);
-       }
-    }while (*str++ != '\0');
 }
 
 void riceviItinerario (int fd, TRENO *trenoCorrente) {  //Ricevo 7 stringhe e le metto correttamente all'interno dell'itinerario del treno
     char str[200];
     int i = 0;
     for(int i = 0; i<7; i++){
-        leggiElemento(fd, str, *trenoCorrente);
+        leggiElemento(fd, str);
         trenoCorrente->itinerario[i] = (char*) malloc(strlen(str)*sizeof(char));
         strcpy(trenoCorrente->itinerario[i], str);
     }
-    aggiungiLog(*trenoCorrente,"Itinerario ricevuto con successo!");
+    aggiungiLog("Itinerario ricevuto con successo!");
 }
 
 int impegnaSegmentoETCS1(TRENO trenoCorrente, int numeroSegmento){  //Funzione per la gestione di ETCS1
     char occupato[1];
-    aggiungiLog(trenoCorrente, "Richiedo di accedere al file");
+    aggiungiLog("Richiedo di accedere al file");
     if(numeroSegmento == 0) return 0;   //stazione, permesso sempre accordato
     sem_wait(semafori[numeroSegmento]); //Invio una wait sul semaforo corretto
     lseek(segmentiDescriptor[numeroSegmento], 0, SEEK_SET); //Mi posiziono ad inizio file
@@ -193,7 +148,6 @@ int impegnaSegmentoETCS2(TRENO trenoCorrente, int numeroSegmento, int RBC, int i
     int occupato = 0;
     connettiRBC(trenoCorrente, &RBC);
     send(RBC, &invio, sizeof(int), 0);
-    printf("%s\n", trenoCorrente.itinerario[trenoCorrente.posizioneAttuale + 1]);
     send(RBC, &trenoCorrente.numTreno, sizeof(int), 0);
     if(numeroSegmento != 0) send(RBC, &numeroSegmento, sizeof(int), 0);  //Per mandare il numero di segmento corretto in caso di stazione
     else {
@@ -205,7 +159,7 @@ int impegnaSegmentoETCS2(TRENO trenoCorrente, int numeroSegmento, int RBC, int i
     if(occupato == 1){
         return -1;
     }
-    aggiungiLog(trenoCorrente, "Permesso accordato da RBC!");
+    aggiungiLog("Permesso accordato da RBC!");
     return 0;
 }
 
@@ -224,7 +178,7 @@ void liberaSegmento(TRENO trenoCorrente, int numeroSegmento, int RBC, int invio)
         }
         close(RBC);
     }
-    aggiungiLog(trenoCorrente, "Segmento precedente liberato con successo!");
+    aggiungiLog("Segmento precedente liberato con successo!");
 }
 
 void eseguiStep(TRENO trenoCorrente, int numeroSegmentoProssimo, int RBC){  //Funzione che gestisce i singoli step del treno
@@ -232,36 +186,36 @@ void eseguiStep(TRENO trenoCorrente, int numeroSegmentoProssimo, int RBC){  //Fu
     int successo2;
     do{
         if((successo1 = impegnaSegmentoETCS1(trenoCorrente, numeroSegmentoProssimo)) != 0){ //La funzione impegnaSegmentoETCS1 ritorna -1 se il segmento è occupato
-            aggiungiLog(trenoCorrente, "Segmento occupato");
+            aggiungiLog("Segmento occupato");
             if(ETCS == 1) sleep(2);
         }
         if(ETCS == 2){  //Se sono in ETCS2 eseguo ulteriori controlli
             if((successo2 = impegnaSegmentoETCS2(trenoCorrente, numeroSegmentoProssimo, RBC, 1)) != 0){    //Come per impegnaSegmentoETCS1 ritorna -1 se il segmento è occupato
-                aggiungiLog(trenoCorrente, "RBC rifiuta l'accesso");
+                aggiungiLog("RBC rifiuta l'accesso");
                 sleep(2);
             }
             if(successo1 != successo2){ //Se discordanza fra impegnaSegmentoETCS1 e impegnaSegmentoETCS2, il treno va in pausa, in attesa di comandi dall'esterno
-                aggiungiLog(trenoCorrente, "Discordanza fra boe e RBC, treno bloccato in attesa di segnali!");
+                aggiungiLog("Discordanza fra boe e RBC, treno bloccato in attesa di segnali!");
                 pause();
             }
         }
     }while(successo1 != 0); //Si controlla 1 solo fra successo1 e eventualmente successo2, perchè in ogni caso se discordassero il treno andrebbe in pausa
-    aggiungiLog(trenoCorrente, "Permesso accordato, impegno il prossimo segmento e libero il segmento attuale!");
+    aggiungiLog("Permesso accordato, impegno il prossimo segmento e libero il segmento attuale!");
 }
 
 int percorriItinerario(TRENO *trenoCorrente, int RBC){  //Funzione che scorre l'itinerario e chiama le funzioni per percorrerlo
     int numeroSegmentoProssimo; //Segmento a cui si dovrà accedere successivamente
     int numeroSegmentoAttuale;  //Segmento in cui ci troviamo
-    aggiungiLog(*trenoCorrente,"Inizio il mio persorso, esco dalla stazione!");
+    aggiungiLog("Inizio il mio persorso, esco dalla stazione!");
     for(trenoCorrente->posizioneAttuale = 0; trenoCorrente->posizioneAttuale < 6 && strcmp(trenoCorrente->itinerario[trenoCorrente->posizioneAttuale+1], "0") != 0; trenoCorrente->posizioneAttuale++){   //Tutti i treni eseguono 6 iterazioni
-        aggiungiLog(*trenoCorrente,"[ATTUALE:%s],[NEXT:%s]",trenoCorrente->itinerario[trenoCorrente->posizioneAttuale],trenoCorrente->itinerario[trenoCorrente->posizioneAttuale+1]);
+        aggiungiLog("[ATTUALE:%s],[NEXT:%s]",trenoCorrente->itinerario[trenoCorrente->posizioneAttuale],trenoCorrente->itinerario[trenoCorrente->posizioneAttuale+1]);
         numeroSegmentoProssimo = atoi(trenoCorrente->itinerario[trenoCorrente->posizioneAttuale + 1] + 2);  //Restituisce il numero del segmento, con stazione restituisce 0
         numeroSegmentoAttuale = atoi(trenoCorrente->itinerario[trenoCorrente->posizioneAttuale] + 2);   //Restituisce il numero del segmento, con stazione restituisce 0
         eseguiStep(*trenoCorrente, numeroSegmentoProssimo, RBC);
         liberaSegmento(*trenoCorrente, numeroSegmentoAttuale, RBC, 0);
         sleep(2);
     }
-    aggiungiLog(*trenoCorrente,"Concludo il mio percorso, sono in stazione!");
+    aggiungiLog("Concludo il mio percorso, sono in stazione!");
 }
 
 int main(int argc, char *argv[]) {
@@ -278,11 +232,12 @@ int main(int argc, char *argv[]) {
 
     trenoCorrente.numTreno = 0;
     creaLog(&trenoCorrente);
+    logFile = trenoCorrente.log;
     creaSegmenti();
     inizializzaSemafori();
     if(ETCS == 2){
         accediSocket(&RBC, &RBCAddress, &RBCLen, "ServerRBC");
-        connetti(trenoCorrente, RBC, RBCAddressPtr, RBCLen);
+        connetti(RBC, RBCAddressPtr, RBCLen);
         riceviPid(RBC, &pid[7]);
     }
     for(int i = 1; i<6; i++){
@@ -290,28 +245,29 @@ int main(int argc, char *argv[]) {
         else if(pid[i] == 0){ //Codice dei figli
             trenoCorrente.numTreno = i;
             creaLog(&trenoCorrente);
-            aggiungiLog(trenoCorrente,"Inizio del logging, mi connetto a RegistroTreni");
+            logFile = trenoCorrente.log;
+            aggiungiLog("Inizio del logging, mi connetto a RegistroTreni");
             accediSocket(&registro, &registroAddress, &registroLen, "RegistroTreni");
-            connetti(trenoCorrente, registro, registroAddressPtr, registroLen);
+            connetti(registro, registroAddressPtr, registroLen);
             inviaNumero(registro, trenoCorrente);
             riceviItinerario(registro, &trenoCorrente);
             if(strcmp(trenoCorrente.itinerario[trenoCorrente.posizioneAttuale], "0") != 0){
                 percorriItinerario(&trenoCorrente, RBC);
             }
             else{
-               aggiungiLog(trenoCorrente,"Treno non necessario, non in partenza dalla stazione!");
+               aggiungiLog("Treno non necessario, non in partenza dalla stazione!");
             }
             preliminariTerminazione(&trenoCorrente);
             pause(); //Si mette in attesa di segnali
         }
-        aggiungiLog(trenoCorrente, "Fork: %d creata con pid: %d", i, pid[i]); //eseguito dal padre
+        aggiungiLog("Fork: %d creata con pid: %d", i, pid[i]); //eseguito dal padre
     }
 
     //Codice del padre
-    aggiungiLog(trenoCorrente, "Padre treni è in attesa della terminazione dei figli:...");
+    aggiungiLog("Padre treni è in attesa della terminazione dei figli:...");
     while(terminato < 5) pause(); //In attesa di 5 segnali
     terminaProcessi(pid);
-    aggiungiLog(trenoCorrente, "Tutti i treni sono arrivati a destinazione, termino");
+    aggiungiLog("Tutti i treni sono arrivati a destinazione, termino");
     fclose(trenoCorrente.log);
     return 0;
 }

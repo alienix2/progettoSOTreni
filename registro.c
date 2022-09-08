@@ -96,7 +96,6 @@ void riempiDue(char *itinerario[6][7]){    //ToDo
 
 int receiveNumero(int fd, int *numeroTreno) {
     recv(fd, numeroTreno, sizeof(numeroTreno), 0);
-    printf("Numero treno: %d\n", *numeroTreno);
 }
 
 int sendItinerario(int fd, char *itinerario[6][7], int numeroTreno){
