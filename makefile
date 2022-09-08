@@ -24,7 +24,7 @@ treno.o: treno.c
 launcher.o: launcher.c
 	gcc -c launcher.c
 
-sharedLibraries.o: ./utilities/sharedFunctions.c ./utilities/sharedFunctions.h
+sharedFunctions.o: ./utilities/sharedFunctions.c ./utilities/sharedFunctions.h
 	gcc -c ./utilities/sharedFunctions.c
 
 pulizia:
