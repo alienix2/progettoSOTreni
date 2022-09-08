@@ -130,17 +130,14 @@ int impegnaSegmentoETCS1(TRENO trenoCorrente, int numeroSegmento){  //Funzione p
     char occupato[1];
     aggiungiLog("Richiedo di accedere al file");
     if(numeroSegmento == 0) return 0;   //stazione, permesso sempre accordato
-    sem_wait(semafori[numeroSegmento]); //Invio una wait sul semaforo corretto
     lseek(segmentiDescriptor[numeroSegmento], 0, SEEK_SET); //Mi posiziono ad inizio file
     read(segmentiDescriptor[numeroSegmento], &occupato, 1); //Leggo il contenuto
     if(strcmp(occupato,"1") == 0){  //Se è occupato ritorno -1
-        sem_post(semafori[numeroSegmento]);
         return -1;
     }
     ftruncate(segmentiDescriptor[numeroSegmento], 0);   //Altrimenti eseguo correttamente una write di 0, eseguo una signal sul semaforo e ritorno 0
     lseek(segmentiDescriptor[numeroSegmento],0,SEEK_SET);
     write(segmentiDescriptor[numeroSegmento], "1", 1);
-    sem_post(semafori[numeroSegmento]);
     return 0;
 }
 
@@ -182,23 +179,24 @@ void liberaSegmento(TRENO trenoCorrente, int numeroSegmento, int RBC, int invio)
 }
 
 void eseguiStep(TRENO trenoCorrente, int numeroSegmentoProssimo, int RBC){  //Funzione che gestisce i singoli step del treno
-    int successo1;
-    int successo2;
+    int successo1 = 0;
+    int successo2 = 0;
     do{
+        if(numeroSegmentoProssimo != 0) sem_wait(semafori[numeroSegmentoProssimo]);
         if((successo1 = impegnaSegmentoETCS1(trenoCorrente, numeroSegmentoProssimo)) != 0){ //La funzione impegnaSegmentoETCS1 ritorna -1 se il segmento è occupato
             aggiungiLog("Segmento occupato");
-            if(ETCS == 1) sleep(2);
         }
         if(ETCS == 2){  //Se sono in ETCS2 eseguo ulteriori controlli
             if((successo2 = impegnaSegmentoETCS2(trenoCorrente, numeroSegmentoProssimo, RBC, 1)) != 0){    //Come per impegnaSegmentoETCS1 ritorna -1 se il segmento è occupato
                 aggiungiLog("RBC rifiuta l'accesso");
-                sleep(2);
             }
             if(successo1 != successo2){ //Se discordanza fra impegnaSegmentoETCS1 e impegnaSegmentoETCS2, il treno va in pausa, in attesa di comandi dall'esterno
                 aggiungiLog("Discordanza fra boe e RBC, treno bloccato in attesa di segnali!");
                 pause();
             }
         }
+        if(numeroSegmentoProssimo != 0) sem_post(semafori[numeroSegmentoProssimo]);
+        sleep(2);
     }while(successo1 != 0); //Si controlla 1 solo fra successo1 e eventualmente successo2, perchè in ogni caso se discordassero il treno andrebbe in pausa
     aggiungiLog("Permesso accordato, impegno il prossimo segmento e libero il segmento attuale!");
 }
