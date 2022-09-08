@@ -73,6 +73,7 @@ void creaSegmenti(){    //Funzione richiamata dal padre, inizializza 20 file di 
     char ma[20];
     for(int i = 1; i<17; i++){
         sprintf(ma, "%s/MA%d.txt", itinerarioFolder, i);
+        remove(ma); //Rimuove il file se già presente, in modo da evitare file sporchi dopo un'esecuzione finita male
         segmentiDescriptor[i] = open(ma, O_CREAT|O_RDWR);
         fchmod(segmentiDescriptor[i], S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
         if(write(segmentiDescriptor[i], "0", 1) < 0) exit(EXIT_FAILURE);
@@ -84,6 +85,7 @@ void inizializzaSemafori(){ //Funzione richiamata dal padre, inizializza 17 sema
     for(int i = 1; i<17; i++){
         nomiSemafori[i] = (char*) malloc(strlen(nome));
         sprintf(nomiSemafori[i], "sem%d", i);
+        sem_unlink(nomiSemafori[i]); //Rimuove il semaforo se già presente, in modo da evitare valori sporchi dopo un'esecuzione finita male
         semafori[i] = sem_open(nomiSemafori[i], O_CREAT, 0777, 1);
     }
 }
