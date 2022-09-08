@@ -14,7 +14,7 @@
 #include <sys/un.h> /* For AFUNIX sockets */
 #define DEFAULT_PROTOCOL 0
 
-#include "./utilities/sharedLibraries.h"
+#include "./utilities/sharedFunctions.h"
 
 char *logFolder = "./logs/RBC";
 

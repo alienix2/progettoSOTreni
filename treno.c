@@ -14,7 +14,7 @@
 #include <sys/un.h> 
 #include <sys/stat.h>
 
-#include "./utilities/sharedLibraries.h"
+#include "./utilities/sharedFunctions.h"
 
 
 char *itinerarioFolder = "./itinerario";    //Usato per poter cambiare a piacimento la directory per i file di testo MAX

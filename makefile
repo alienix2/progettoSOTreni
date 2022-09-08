@@ -1,13 +1,13 @@
 creaProcessi: RBC registro treno launcher pulizia
 
-RBC: RBC.o sharedLibraries.o
+RBC: RBC.o sharedFunctions.o
 	gcc -o RBC RBC.o sharedLibraries.o
 
 registro: registro.o
 	gcc -o registro registro.o
 
-treno: treno.o sharedLibraries.o
-	gcc -o treno treno.o sharedLibraries.o
+treno: treno.o sharedFunctions.o
+	gcc -o treno treno.o sharedFunctions.o
 
 launcher: launcher.o
 	gcc -o launcher launcher.o
@@ -24,8 +24,8 @@ treno.o: treno.c
 launcher.o: launcher.c
 	gcc -c launcher.c
 
-sharedLibraries.o: ./utilities/sharedLibraries.c ./utilities/sharedLibraries.h
-	gcc -c ./utilities/sharedLibraries.c
+sharedLibraries.o: ./utilities/sharedFunctions.c ./utilities/sharedFunctions.h
+	gcc -c ./utilities/sharedFunctions.c
 
 pulizia:
-	rm sharedLibraries.o treno.o registro.o RBC.o launcher.o
+	rm sharedFunctions.o treno.o registro.o RBC.o launcher.o
