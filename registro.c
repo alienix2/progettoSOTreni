@@ -9,7 +9,7 @@
 #define DEFAULT_PROTOCOL 0
 
 //Registro di PROVA, ToDo quello vero
-void riempiUno(char *itinerario[6][7]){
+void riempiUno(char *itinerario[6][7]){ //Funzione che riempie MAPPA1
     itinerario[1][0] = "S1";
     itinerario[1][1] = "MA1";
     itinerario[1][2] = "MA2";
@@ -51,7 +51,7 @@ void riempiUno(char *itinerario[6][7]){
     itinerario[5][6] = "0";
 }
 
-void riempiDue(char *itinerario[6][7]){    //ToDo
+void riempiDue(char *itinerario[6][7]){ //Funzione che riempie MAPPA2
     itinerario[1][0] = "S2";
     itinerario[1][1] = "MA5";
     itinerario[1][2] = "MA6";
@@ -97,7 +97,7 @@ int receiveNumero(int fd, int *numeroTreno) {
     recv(fd, numeroTreno, sizeof(numeroTreno), 0);
 }
 
-int sendItinerario(int fd, char *itinerario[6][7], int numeroTreno){
+int sendItinerario(int fd, char *itinerario[6][7], int numeroTreno){    //Verifico chi ha fatto la richiesta e invio il giusto itinerario
     if(numeroTreno == 0){
         for(int k = 1; k<6; k++){
             for(int i = 0; i<7; i++){
@@ -115,10 +115,10 @@ int sendItinerario(int fd, char *itinerario[6][7], int numeroTreno){
 
 int main (int argc, char *argv[]) {
     int registro, clientFd, serverLen, clientLen;
-    struct sockaddr_un registroAddress; /*Server address */
-    struct sockaddr* serverSockAddrPtr; /*Ptr to server address*/
-    struct sockaddr_un clientUNIXAddress; /*Client address */
-    struct sockaddr* registroAddressPtr;/*Ptr to client address*/
+    struct sockaddr_un registroAddress;
+    struct sockaddr* serverSockAddrPtr;
+    struct sockaddr_un clientUNIXAddress;
+    struct sockaddr* registroAddressPtr;
     int numeroTreno;
 
     char *itinerario[6][7];
@@ -133,24 +133,24 @@ int main (int argc, char *argv[]) {
     clientLen = sizeof (clientUNIXAddress);
   
     registro = socket (AF_UNIX, SOCK_STREAM, DEFAULT_PROTOCOL);
-    registroAddress.sun_family = AF_UNIX; /* Set domain type */
+    registroAddress.sun_family = AF_UNIX;
 
-    strcpy (registroAddress.sun_path, "RegistroTreni"); /* Set name */
-    unlink ("RegistroTreni"); /* Remove file if it already exists */
+    strcpy (registroAddress.sun_path, "RegistroTreni");
+    unlink ("RegistroTreni"); 
 
-    bind (registro, serverSockAddrPtr, serverLen);/*Create file*/
-    listen (registro, 6); /* Maximum pending connection length */
+    bind (registro, serverSockAddrPtr, serverLen);
+    listen (registro, 6);
 
-    while (1) {/* Loop forever */ /* Accept a client connection */
+    while (1) { //Ciclo di accettazione delle richieste
         clientFd = accept (registro, registroAddressPtr, &clientLen);
-        if (fork () == 0) { /* Create child to send receipe */
-            receiveNumero(clientFd, &numeroTreno);
+        if (fork () == 0) { //Creo un figlio per gestire una richiesta
+            recv(clientFd, &numeroTreno, sizeof(numeroTreno), 0);
             sendItinerario(clientFd, itinerario, numeroTreno);
             exit(EXIT_SUCCESS);
         }
         else{
             signal(SIGCHLD, SIG_IGN); 
-            close(clientFd);/* Close the client descriptor */
+            close(clientFd);
         }
     }
 }

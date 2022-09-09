@@ -25,7 +25,7 @@ void terminaProcessoHandler(){  //Handler che cattura il segnale da padreTreni e
     exit(EXIT_SUCCESS);
 }
 
-void riceviItinerari (int fd, char *itinerari[6][7]) {  //Ricevo 7 stringhe e le metto correttamente all'interno dell'itinerario del treno
+void riceviItinerari (int fd, char *itinerari[6][7]) {  //Ricevo 6*7 stringhe e le metto nella matrice degli itinerari
     char str[200];
     for(int k = 1; k<6; k++){
         for(int i = 0; i<7; i++){
@@ -36,7 +36,7 @@ void riceviItinerari (int fd, char *itinerari[6][7]) {  //Ricevo 7 stringhe e le
     }
 }
 
-void inviaNumero(int fd){  //Invia un numero sul canale
+void inviaNumero(int fd){  //Invia un numero sul canale, con verifiche di corretto invio
     int numero = 0;
     while(send(fd, &numero, sizeof(numero), 0) < 0){
         sleep(2);
@@ -44,7 +44,7 @@ void inviaNumero(int fd){  //Invia un numero sul canale
     aggiungiLog("Numero inviato con successo a registro!");
 }
 
-void impostaStazioni(char *itinerari[6][7], int stazioni[9]){
+void impostaStazioni(char *itinerari[6][7], int stazioni[9]){   //All'inizio imposto i giusti valori nelle stazioni guardando la mappa
     int numeroStazione;
     for(int k = 1; k<6; k++){
         if((numeroStazione = atoi(itinerari[k][0] + 1)) != 0)   //Per evitare di incrementare la stazione 0 nel caso di mapppa1
@@ -52,13 +52,13 @@ void impostaStazioni(char *itinerari[6][7], int stazioni[9]){
     }
 }
 
-void inviaPid(int RBC, struct sockaddr *RBCAddressPtr, int clientLen){
+void inviaPid(int RBC, struct sockaddr *RBCAddressPtr, int clientLen){  //Accetta la connessione da padreTreni e gli manda il suo PID
     int invio;
     int clientFd = accept (RBC, RBCAddressPtr, &clientLen);
     invio = getpid();
     while(send(clientFd, &invio, sizeof(invio), 0) < 0){
-        aggiungiLog("ERRORE: PID non inviato con successo a padreTreni, ritento in 3 secondi");
-        sleep(3);   //In caso di fallimento
+        aggiungiLog("ERRORE: PID non inviato con successo a padreTreni, ritento in 2 secondi");
+        sleep(2);   //In caso di fallimento attende 2 secondi e riprova
     }
     aggiungiLog("PID inviato con successo a padreTreni per la terminazione finale");
     close(clientFd);
@@ -70,7 +70,7 @@ void gestisciAccesso(int clientFd, int segmenti[17], int stazioni[9]){
     int invio;
     recv(clientFd, &numeroTreno, sizeof(int), 0);   //Ricevo il numero del treno per composizione log
     recv(clientFd, &numeroSegmento, sizeof(int), 0);    //Ricevo la posizione dove intende accedere
-    if(numeroSegmento > 20) stazioni[numeroSegmento - 20]++;
+    if(numeroSegmento > 20) stazioni[numeroSegmento - 20]++;    // Se il numero è maggiore di 20 riconosco una stazione e modifico il vettore delle stazioni
     else if(segmenti[numeroSegmento] == 0){
         invio = 0;
         send(clientFd, &invio, sizeof(int), 0);   //0 risposta positiva
@@ -89,7 +89,7 @@ void gestisciAbbandono(int clientFd, int segmenti[17], int stazioni[8]){
     int numeroSegmento;
     recv(clientFd, &numeroTreno, sizeof(int), 0);   //Ricevo il numero del treno per composizione log
     recv(clientFd, &numeroSegmento, sizeof(int), 0);    //Ricevo la posizione che lascia
-    if(numeroSegmento > 20) {
+    if(numeroSegmento > 20) {   // Se il numero è maggiore di 20 riconosco una stazione e modifico il vettore delle stazioni
         aggiungiLog("Il treno numero:%d ha lasciato la stazione:S%d", numeroTreno, (numeroSegmento-20));
         stazioni[numeroSegmento - 20]--;
     }
@@ -100,7 +100,7 @@ void gestisciAbbandono(int clientFd, int segmenti[17], int stazioni[8]){
     
 }
 
-void gestisciRichiesta(int RBC, struct sockaddr *RBCAddressPtr, int clientLen, int segmenti[17], int stazioni[8]){
+void gestisciRichiesta(int RBC, struct sockaddr *RBCAddressPtr, int clientLen, int segmenti[17], int stazioni[8]){  //Funzione che indirizza al giusto servizio
     int richiesta;
     int clientFd = accept (RBC, RBCAddressPtr, &clientLen); //Accetto una connessione
     recv(clientFd, &richiesta, sizeof(int), 0); //Ricevo il numero della richiesta, 1 accesso, 0 abbandono
@@ -118,9 +118,9 @@ int main (void) {
     int occupazioneSegmenti[17] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
     int stazioni[9] = {0,0,0,0,0,0,0,0,0};
 
-    struct sockaddr* serverSockAddrPtr; /*Ptr to server address*/
-    struct sockaddr_un clientUNIXAddress; /*Client address */
-    struct sockaddr_un RBCAddress; //Indirizzo del registro
+    struct sockaddr* serverSockAddrPtr;
+    struct sockaddr_un clientUNIXAddress;
+    struct sockaddr_un RBCAddress;
     struct sockaddr* RBCAddressPtr = (struct sockaddr*) &RBCAddress; //Puntatore all'indirizzo del registro
 
     struct sockaddr_un registroAddress; //Indirizzo del registro
@@ -140,17 +140,17 @@ int main (void) {
     impostaStazioni(itinerari, stazioni);
 
     RBC = socket (AF_UNIX, SOCK_STREAM, DEFAULT_PROTOCOL);
-    RBCAddress.sun_family = AF_UNIX; // Set domain type
+    RBCAddress.sun_family = AF_UNIX;
 
-    strcpy (RBCAddress.sun_path, "ServerRBC"); // Set name 
-    unlink ("ServerRBC"); //Remove file if it already exists
+    strcpy (RBCAddress.sun_path, "ServerRBC"); 
+    unlink ("ServerRBC");
 
-    bind (RBC, serverSockAddrPtr, serverLen);//Create file
-    listen (RBC, 0); //Maximum pending connection length
+    bind (RBC, serverSockAddrPtr, serverLen);
+    listen (RBC, 0);
 
     inviaPid(RBC, RBCAddressPtr, clientLen);
 
-    while(1){
+    while(1){ //Ciclo di accettazione delle richieste
         gestisciRichiesta(RBC, RBCAddressPtr, clientLen, occupazioneSegmenti, stazioni);
     }
     return 0;

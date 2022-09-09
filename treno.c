@@ -162,7 +162,7 @@ int impegnaSegmentoETCS2(TRENO trenoCorrente, int numeroSegmento, int RBC, int i
 }
 
 void liberaSegmento(TRENO trenoCorrente, int numeroSegmento, int RBC, int invio){  //Funzione che libera il segmento corrente
-    if(numeroSegmento != 0){    //Se non ho passato una stazione
+    if(numeroSegmento != 0){    //Se non ho liberato una stazione
         ftruncate(segmentiDescriptor[numeroSegmento], 0);   //Tronco il file
         lseek(segmentiDescriptor[numeroSegmento], 0, SEEK_SET); //Vado alla posizione 0 e scrivo 0
         write(segmentiDescriptor[numeroSegmento], "0", 1); //Il disimpegno è fatto senza preoccupazioni perchè si presuppone che nel peggiore dei casi porti ad una lettura in più
