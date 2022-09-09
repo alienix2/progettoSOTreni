@@ -1,9 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h> /* for fork */
-#include <sys/types.h> /* for pid_t */
-#include <sys/wait.h> /* for wait */
+#include <unistd.h>
+#include <sys/types.h>
 
 int main(int argc, char *argv[]){
     int pid1, pid2, pid3, wpid;

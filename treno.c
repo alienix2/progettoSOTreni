@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <arpa/inet.h>
 #include <time.h>
 #include <semaphore.h>
 #include <fcntl.h>

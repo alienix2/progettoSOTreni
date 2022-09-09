@@ -2,14 +2,9 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
-#include <stdarg.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/shm.h>
 #include <semaphore.h>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h> /* For AFUNIX sockets */
 #define DEFAULT_PROTOCOL 0
@@ -24,15 +19,10 @@ void creaLog(){ //Funzione che crea un log partendo dal numeroTreno del treno ch
     logFile = fopen(nomeLog, "w");
 }
 
-void terminaProcessoHandler(){
+void terminaProcessoHandler(){  //Handler che cattura il segnale da padreTreni e termina RBC
     aggiungiLog("Sono stato terminato con successo da padreTreni!");
     fclose(logFile);
     exit(EXIT_SUCCESS);
-}
-
-int receiveNumero(int fd) {
-    int numero;
-    recv(fd, &numero, sizeof(numero), 0);
 }
 
 void riceviItinerari (int fd, char *itinerari[6][7]) {  //Ricevo 7 stringhe e le metto correttamente all'interno dell'itinerario del treno
@@ -163,6 +153,5 @@ int main (void) {
     while(1){
         gestisciRichiesta(RBC, RBCAddressPtr, clientLen, occupazioneSegmenti, stazioni);
     }
-    //creaConnessione();*/
     return 0;
 }

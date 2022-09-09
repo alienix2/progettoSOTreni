@@ -6,7 +6,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h> /* For AFUNIX sockets */
-#include <arpa/inet.h>
 #define DEFAULT_PROTOCOL 0
 
 //Registro di PROVA, ToDo quello vero
