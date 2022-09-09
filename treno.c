@@ -59,10 +59,10 @@ void terminaProcessi(int pid[7]){   //Funzione richiamata dal padre, chiude tutt
     if(ETCS == 2) kill(pid[7], SIGUSR2);
 }
 
-void riceviPid(int fd, int *pid){
+void riceviPid(int fd, int *pid){   //Funzione che riceve un numero e lo assegna correttamente a PID
     if(recv(fd, pid, sizeof(int), 0) < 0){
-        aggiungiLog("ERRORE: Pid non ricevuto con successo, ritento in 3 secondi");
-        sleep(3);
+        aggiungiLog("ERRORE: Pid non ricevuto con successo, ritento in 2 secondi");
+        sleep(2);
     }
     aggiungiLog("Pid ricevuto con successo, sono in grado di terminare RBC a fine programma");
     close(fd);
@@ -142,17 +142,17 @@ int impegnaSegmentoETCS1(TRENO trenoCorrente, int numeroSegmento){  //Funzione p
     return 0;
 }
 
-int impegnaSegmentoETCS2(TRENO trenoCorrente, int numeroSegmento, int RBC, int invio){ //Funzione per la gestione di ETCS2 *ToDo in parte?*
+int impegnaSegmentoETCS2(TRENO trenoCorrente, int numeroSegmento, int RBC, int invio){ //Funzione per la gestione di ETCS2
     int occupato = 0;
     connettiRBC(trenoCorrente, &RBC);
-    send(RBC, &invio, sizeof(int), 0);
-    send(RBC, &trenoCorrente.numTreno, sizeof(int), 0);
-    if(numeroSegmento != 0) send(RBC, &numeroSegmento, sizeof(int), 0);  //Per mandare il numero di segmento corretto in caso di stazione
-    else {
+    send(RBC, &invio, sizeof(int), 0);  //Invio prima il numero della richiesta effettuata
+    send(RBC, &trenoCorrente.numTreno, sizeof(int), 0); //Dopodichè invio il numero del treno
+    if(numeroSegmento != 0) send(RBC, &numeroSegmento, sizeof(int), 0);  //Infine invio il numero del segmento
+    else {                                                                //Aggiungo 20 per identificare le stazioni
         invio = (atoi(trenoCorrente.itinerario[trenoCorrente.posizioneAttuale + 1] + 1) + 20);
-        send(RBC, &invio, sizeof(int), 0);  //Aggiungo 20 per distinguerle dai segmenti normali
+        send(RBC, &invio, sizeof(int), 0);
     }
-    recv(RBC, &occupato, 1, 0);
+    recv(RBC, &occupato, 1, 0); //Ricevo la risposta e chiudo il file descriptor
     close(RBC);
     if(occupato == 1){
         return -1;
@@ -167,12 +167,12 @@ void liberaSegmento(TRENO trenoCorrente, int numeroSegmento, int RBC, int invio)
     write(segmentiDescriptor[numeroSegmento], "0", 1); //Il disimpegno è fatto senza preoccupazioni perchè si presuppone che nel peggiore dei casi porti ad una lettura in più
     if(ETCS == 2){  //Libero in RBC se ETCS == 2
         connettiRBC(trenoCorrente, &RBC);
-        send(RBC, &invio, sizeof(int), 0);
-        send(RBC, &trenoCorrente.numTreno, sizeof(int), 0);
-        if(numeroSegmento != 0) send(RBC, &numeroSegmento, sizeof(int), 0);  //Per mandare il numero di segmento corretto in caso di stazione
-        else {
+        send(RBC, &invio, sizeof(int), 0);  //Invio il numero della richiesta
+        send(RBC, &trenoCorrente.numTreno, sizeof(int), 0); //Invio il numero del treno
+        if(numeroSegmento != 0) send(RBC, &numeroSegmento, sizeof(int), 0);  //invio il numero del segmento
+        else {                                                               //Aggiungo 20 per identificare le stazioni
             invio = (atoi(trenoCorrente.itinerario[trenoCorrente.posizioneAttuale] + 1) + 20);
-            send(RBC, &invio, sizeof(int), 0);  //Aggiungo 20 per distinguerle dai segmenti normali
+            send(RBC, &invio, sizeof(int), 0);  
         }
         close(RBC);
     }
@@ -239,7 +239,7 @@ int main(int argc, char *argv[]) {
         connetti(RBC, RBCAddressPtr, RBCLen);
         riceviPid(RBC, &pid[7]);
     }
-    for(int i = 1; i<6; i++){
+    for(int i = 1; i<6; i++){   //Uso un ciclo da 1 a 6 per comodità
         if((pid[i] = fork()) < 0) exit(EXIT_FAILURE);
         else if(pid[i] == 0){ //Codice dei figli
             trenoCorrente.numTreno = i;
@@ -250,7 +250,7 @@ int main(int argc, char *argv[]) {
             connetti(registro, registroAddressPtr, registroLen);
             inviaNumero(registro, trenoCorrente);
             riceviItinerario(registro, &trenoCorrente);
-            if(strcmp(trenoCorrente.itinerario[trenoCorrente.posizioneAttuale], "0") != 0){
+            if(strcmp(trenoCorrente.itinerario[trenoCorrente.posizioneAttuale], "0") != 0){ //Se il primo segmento contiene "0" il treno non è necessario
                 percorriItinerario(&trenoCorrente, RBC);
             }
             else{
