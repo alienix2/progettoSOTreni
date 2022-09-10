@@ -14,7 +14,7 @@
 #include <sys/un.h> 
 #include <sys/stat.h>
 
-#include "sharedLibraries.h"
+#include "sharedFunctions.h"
 
 FILE *logFile;
 
